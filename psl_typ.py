@@ -298,6 +298,22 @@ class PslTypHex(PslTyp):
 
 ################################################################################
 
+class PslTypInt(PslTyp):
+    "just decode to int"
+    def pack_py(self, value):
+        return binascii.unhexlify(value)
+
+    def unpack_py(self, value):
+        return int(binascii.hexlify(value).decode(), 16)
+
+    def pack_cmd(self, value):
+        return self.pack_py(value)
+
+    def unpack_cmd(self, value):
+        return self.unpack_py(value)
+
+################################################################################
+
 class PslTypUnknown(PslTypHex):
     "Unknown Data"
     def unpack_cmd(self, value):
@@ -992,11 +1008,18 @@ class PslTypPortMirror(PslTyp):
                  }
 
     def unpack_py(self, value):
-        dst_port, fixme, src_ports = struct.unpack(">bbb", value)
+        # 16 port switch adds an extra byte
+        if len(value) == 4:
+            dst_port, fixme, src_ports, src_ports2 = struct.unpack(">BBBB", value)
+        else:
+            dst_port, fixme, src_ports = struct.unpack(">BBB", value)
         out_src_ports = []
         for port in list(self.BIN_PORTS.keys()):
             if (src_ports & self.BIN_PORTS[port] > 0):
                 out_src_ports.append(port)
+            if (src_ports2 & self.BIN_PORTS[port] > 0):
+                out_src_ports.append(port+8)
+        out_src_ports.sort()
 
         if dst_port == 0:
             return "No Port Mirroring has been set up"
